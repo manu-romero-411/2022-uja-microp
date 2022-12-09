@@ -1,34 +1,34 @@
-float sp = 0;
-float heart = 0;
+#include <SoftwareSerial.h>
 
-void bucleLed(){
-  digitalWrite(4,HIGH);
-  delay(200);
-  digitalWrite(4,LOW);
+int led = 13; //Led connected to pin 13
+int data = 0; //Serial Data
+int data2 = 0; //RX TX Data
 
-    digitalWrite(6,HIGH);
-  delay(200);
-  digitalWrite(6,LOW);
+SoftwareSerial mySerial(6, 7); // RX, TX
 
-    digitalWrite(9,HIGH);
-  delay(200);
-  digitalWrite(9,LOW);
+void setup()
+{
+  while (!Serial) {
+    ; // Wait for serial port to connect. Needed for native USB port only
+  }
+  Serial.begin(9600);
+  mySerial.begin(9600);
+  pinMode(led, OUTPUT);
 }
 
-void setup() {
-  Serial.begin(115200);
-    pinMode(4,OUTPUT);
-    pinMode(6,OUTPUT);
-        pinMode(9,OUTPUT);
-}
 void loop()
 {
-  sp = 5 + random(5);
-  heart = 100 + random(40);
-  Serial.print(sp);
-  Serial.print(",");
-  Serial.println(heart);
-  Serial.println("O B A M A");
-  bucleLed();
-  delay(400);
+  int query = 9;
+ if (Serial.available() > 0) {
+    mySerial.write(Serial.parseInt());
+  }
+
+  if (mySerial.available() > 0) {
+    data2 = mySerial.read();
+    if(query == 9){
+       Serial.print("minuto ");
+          Serial.println(data2);
+    }
+  }
+  delay(1000);
 }
