@@ -1,3 +1,4 @@
+
 #include <SoftwareSerial.h>
 
 // VARIABLES COMUNES ENTRE UNO Y WEMOS
@@ -6,14 +7,35 @@ int minuto;
 float temperatura;
 int isOnOff;
 int isIntruso;
-
-int minutoIntruso;
-int horaIntruso;
-int umbralHoraAlto;
-int umbralHoraBajo;
-
 int isEmergencia;
+int emergenciaPrevia;
 
+/* OTRAS VARIABLES AUXILIARES */
+// DETECCIÓN DE INTRUSOS SEGÚN HORA
+int minutoIntruso = 61;
+int umbralHoraAlto = 17;
+int umbralHoraBajo = 15;
+int espera = 1;
+
+// SENSOR DE ULTRASONIDOS
+long duration, distance; // Duration used to calculate distance
+int maximumRange = 25; // Maximum range needed
+int minimumRange = 1; // Minimum range needed
+
+// SENSOR DE TEMPERATURA
+int tempMin = 19;
+int tempMinMin = 18;
+int tempMax = 29;
+int tempMaxMax = 30;
+
+// INTERRUPTOR
+/* DEFINICIÓN DE PUERTOS */
+int ultraEcho = 8;
+int ultraTrig = 9;
+int buzzer = 12;
+int lm35pin = A0;
+int interruptor = 4;
+int luzCasa = 5;
 int led = 13; //Led connected to pin 13
 
 String recibo;
@@ -28,16 +50,22 @@ void setup(){
   }
   Serial.begin(9600);
   mySerial.begin(9600);
+  
   pinMode(led, OUTPUT);
 
   // PONER EN MARCHA BUZZER
+  pinMode(buzzer, OUTPUT);
 
-  // PONER EN MARCHA TOGGLE INVIERNO-VERANO
+
+  // PONER EN MARCHA INTERRUPTOR
+  pinMode(interruptor, INPUT);
+  pinMode(luzCasa, OUTPUT);
 
   // PONER EN MARCHA TEMPERATURA
 
   // PONER EN MARCHA DETECTAINTRUSOS
-  
+  pinMode(ultraTrig, OUTPUT);
+  pinMode(ultraEcho, INPUT);
 }
 
 // DIVIDIR STRINGS PARA TRANSFORMARLAS EN VARIABLES
@@ -107,6 +135,7 @@ char *ftoa(double d, char *buffer, int precision) {
 }
 
 void wemos_recibir(){
+  Serial.write("recibiendo...");
   if(mySerial.available() > 0){
     while (!stringComplete){
       char inChar = mySerial.read();
@@ -134,6 +163,7 @@ void wemos_recibir(){
 }
 
 void wemos_enviar(){
+  Serial.write("enviando...");
 
   // HACER LA CONVERSIÓN A ARRAY
   char tempe[7];
@@ -158,82 +188,119 @@ void wemos_enviar(){
   mySerial.write('_');
 }
 
-void medirTemperatura(){
-  /*ESTO HAY QUE CAMBIARLO PARA AMOLDARLO AL SENSOR*/
-  temperatura = 14.56;
-  
-  if(temperatura <= 5){ // UMBRAL DE FRÍO MODERADO
-    isEmergencia = 1; 
+void triggerEmergencia(){
+  Serial.println("Esto es un pooblema previo");
+  if(isEmergencia == 1){
+    Serial.println("Esto es un pooblema 1");
+    digitalWrite(led, HIGH);
   } else {
-    if(temperatura <= 0){ // UMBRAL DE FRÍO EXTREMO
-      isEmergencia = 2;
+    if (isEmergencia == 2){
+      Serial.println("Esto es un pooblema 2");
+      digitalWrite(led, HIGH);
+      digitalWrite(buzzer, HIGH);
     } else {
-      if(temperatura >= 20){ // UMBRAL DE CALOR MODERADO
-         isEmergencia = 1; 
-      } else {
-        if(temperatura > 25){ // UMBRAL DE CALOR EXTREM0
-          isEmergencia = 2;
-        } else {
-          isEmergencia = 0; // UMBRAL DE TEMPERATURA NORMAL
-        }
+      if (isEmergencia == 0){
+        Serial.println("Esto es un pooblema 0");
+        digitalWrite(led, LOW);
+        digitalWrite(buzzer, LOW);
       }
     }
+  }
+}
+
+bool luz(){
+  if (digitalRead(interruptor) == HIGH){
+    digitalWrite(luzCasa, HIGH);
+    return true;
+  } else {
+    digitalWrite(luzCasa, LOW);
+    return false;
   }
 }
 
 void detectarIntrusos(){
-  /*ESTO HAY QUE CAMBIARLO PARA AMOLDARLO AL SENSOR*/
-  int antes = isIntruso;
-  if (true){ /*ULTRASONIDOS DETECTAN INTRUSO*/
-    isIntruso = 1;
-  }
-
-  if(antes < isIntruso){ //SI ANTES NO HABÍA INTRUSO PERO AHORA SÍ
-    minutoIntruso = minuto + 10;
-    horaIntruso = hora;
-  
-    // CORREGIR HORA PARA CUANDO TENGA QUE SONAR EL BUZZER
-    if(minutoIntruso > 60){
-      minutoIntruso -= 60;
-      horaIntruso += 1;
-      if(horaIntruso > 23){
-        horaIntruso = 0;
-      }
-    }
-  
-    Serial.print("Intruso a las ");
-    Serial.print(horaIntruso);
-    Serial.print(':');
-    Serial.println(minutoIntruso);
-  
-    // AJUSTAR MODO DE EMERGENCIA EN FUNCIÓN DE UMBRALES DE HORA
-    if(umbralHoraBajo > umbralHoraAlto){
-      if((horaIntruso > umbralHoraBajo) || (horaIntruso < umbralHoraAlto)){
-        isEmergencia = 1; 
+  if (luz() == 1){ /*ULTRASONIDOS DETECTAN INTRUSO*/
+   emergenciaPrevia = isEmergencia;
+   if(umbralHoraBajo > umbralHoraAlto){
+      if((hora > umbralHoraBajo) || (hora < umbralHoraAlto)){
+        Serial.println("=== EMERGENCIA ===");
+        isEmergencia = 2;
       }
     } else {
-      if(horaIntruso < umbralHoraAlto){
-        isEmergencia = 1;
+      if(hora < umbralHoraAlto){
+        Serial.println("=== OTRA EMERGENCIA ===");
+        isEmergencia = 2;
       }
     }
+    if (emergenciaPrevia > isEmergencia){
+      isEmergencia = emergenciaPrevia;
+    }
   } else {
-    if(antes > isIntruso){ // SI ANTES HABÍA ALGUIEN Y AHORA NO
+    isEmergencia = 0;
+  }
+}
+
+void sensorMovimiento() {
+  readDistance();
+  Serial.print("distancia: ");
+  Serial.println(distance);
+  emergenciaPrevia = isEmergencia;
+  if(distance>minimumRange && distance < maximumRange){
+    isEmergencia = 2;
+  } else {
+    if (distance > maximumRange) {
       isEmergencia = 0;
     }
   }
+  if (emergenciaPrevia > isEmergencia){
+    isEmergencia = emergenciaPrevia;
+  }
+  delay(50);
 }
 
-// LANZAR EMERGENCIA GRAVE SI EL INTRUSO SIGUE
-void emergenciaIntrusos(){
-  if((horaIntruso == hora) && (minutoIntruso == minuto)){
-    isEmergencia = 2;
-  }
+int readDistance(){
+  digitalWrite(ultraTrig, LOW);
+  delayMicroseconds(2);
+  
+  digitalWrite(ultraTrig, HIGH);
+  delayMicroseconds(10);
+  
+  digitalWrite(ultraTrig, LOW);
+  duration = pulseIn(ultraEcho, HIGH);
+  
+  distance = duration/58.2;
 }
+
+void sensorTemperatura(){ // CAMBIAR PARA QUE DEVUELVA BOOL O INT CON VARIOS ESTADOS
+  int valor = analogRead(lm35pin);
+  float miliVoltios = (valor / 1023.0) * 5000;
+  temperatura = miliVoltios / 10;
+
+  emergenciaPrevia = isEmergencia;
+  if(temperatura < tempMin || temperatura > tempMax){
+    if(temperatura < tempMinMin || temperatura > tempMaxMax){
+      isEmergencia = 2;
+    } else {
+      isEmergencia = 1;
+    }
+  } else {
+    isEmergencia = 0;
+  }
+  if (emergenciaPrevia > isEmergencia){
+    isEmergencia = emergenciaPrevia;
+  }
+  Serial.print(temperatura);
+  Serial.println(" C");
+  delay(50);
+}
+
 
 void loop(){
-  medirTemperatura();
-  detectarIntrusos();
+  triggerEmergencia();
   wemos_enviar();
   wemos_recibir();
+  detectarIntrusos();
+  sensorMovimiento();
+  sensorTemperatura();
   delay(1000);
 }
