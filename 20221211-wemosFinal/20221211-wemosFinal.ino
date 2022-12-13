@@ -44,13 +44,13 @@ void setup(){
   
   while ( WiFi.status() != WL_CONNECTED ) {
     delay ( 500 );
-    //Serial.print ( "." );
+    Serial.print ( "." );
   }
   server.begin();
-  //Serial.println(F("Server started"));
+  Serial.println(F("Server started"));
 
   // Print the IP address
-  //Serial.println(WiFi.localIP());
+  Serial.println(WiFi.localIP());
   timeClient.begin();
 }
 
@@ -131,7 +131,6 @@ void uno_recibir(){
     }
     if (stringComplete){
       temperatura = getValue(recibo, ':', 0).toFloat();
-      isOnOff = getValue(recibo, ':',1).toInt();
       isIntruso = getValue(recibo, ':',2).toInt();
       isEmergencia = getValue(recibo, ':',3).toInt();
       //Serial.print("temperatura: ");
@@ -164,18 +163,11 @@ void web() {
   //Serial.println(req);
 
   // Match the request
-  int val;
-  if (req.indexOf(F("/gpio/0")) != -1) {
-    val = 0;
-  } else if (req.indexOf(F("/gpio/1")) != -1) {
-    val = 1;
-  } else {
-    //Serial.println(F("invalid request"));
-    val = digitalRead(LED_BUILTIN);
+  if (req.indexOf(F("/0")) != -1) {
+    isOnOff = 0;
+  } else if (req.indexOf(F("/1")) != -1) {
+    isOnOff = 2;
   }
-
-  // Set LED according to the request
-  digitalWrite(LED_BUILTIN, val);
 
   // read/ignore the rest of the request
   // do not client.flush(): it is for output only, see below
@@ -188,7 +180,7 @@ void web() {
   // it is OK for multiple small client.print/write,
   // because nagle algorithm will group them into one single packet
   client.print(F("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\n"));
-  client.print(F("<style> h1 { color:  #4f0ad5;  font-size: 1.5em; font-family: Arial, Helvetica, sans-serif; }  h2{ color:   #f44996   !important;  font-size: 1.4em !important; font-family: Arial, Helvetica, sans-serif; } p { font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; } button { border: none; border-radius: 200px; background-color:  #0262cf; color: #fbfbfb; transition: none !important; margin: 5 5px !important; padding: 5px;  transform: none !important; box-shadow: 1px 2px 4px 1px rgba(0, 0, 0, 0.3) !important;  } button:active { border: none; border-radius: 200px; transition: none !important; margin: 5 5px !important; padding: 5px;  box-shadow: none !important; transform: translate3d(1px, 1px, 1px) !important; }  .verde { background-color: #0b800b !important;} .amarillo { background-color: #c59100 !important;} .rojo { background-color: #e70f0f !important;} </style>\r\n"));
+  client.print(F("<style> h1 { color:  #4f0ad5;  font-size: 1.5em; font-family: Arial, Helvetica, sans-serif; }  h2{ color:   #f44996   !important;  font-size: 1.4em !important; font-family: Arial, Helvetica, sans-serif; } p { font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; } button { border: none; background-color:  #0262cf; color: #fbfbfb; transition: none !important; margin: 5 5px !important; padding: 5px;  transform: none !important; box-shadow: 1px 2px 4px 1px rgba(0, 0, 0, 0.3) !important;  }  .verde { background-color: #0b800b !important;} .amarillo { background-color: #c59100 !important;} .rojo { background-color: #e70f0f !important;} </style>\r\n"));
   client.print(F("<head>\r\n"));
   client.print(F("<meta http-equiv=\"refresh\" content=\"5\">\r\n"));
   client.print(F("</head>\r\n"));\
@@ -197,27 +189,35 @@ void web() {
   client.print(F(":"));
   client.print(minuto);
   client.print(F("</h1>\r\n"));
-  client.print(F("<p>Temperatura ahora mismo: "));
-  client.print(temperatura); 
-  client.print(F(" C</p>\r\n"));
-  client.print(F("<h2>Ha entrado alguien en la habitacion supersecreta? "));
-  if(isIntruso == 0){
-    client.print(F("NO"));
-  } else {
-    client.print(F("SI"));
-  }
-  client.print(F("</h2>\r\n"));  
-  if(isEmergencia == 0){
-    client.print(F("<button class=\"verde\">Toggle modo emergencia (ahora mismo: tranquilo"));
-  } else {
-    if(isEmergencia == 1){
-      client.print(F("<button class=\"amarillo\">Toggle modo emergencia (ahora mismo: moderado"));
+  if(isOnOff == 0){
+    client.print(F("<p>Temperatura ahora mismo: "));
+    client.print(temperatura); 
+    client.print(F(" C</p>\r\n"));
+    client.print(F("<h2>Ha entrado alguien en la habitacion supersecreta? "));
+    if(isIntruso == 0){
+      client.print(F("NO"));
     } else {
-      client.print(F("<button class=\"rojo\">Toggle modo emergencia (ahora mismo: EMERGENCIA"));
+      client.print(F("SI"));
     }
+    client.print(F("</h2>\r\n"));  
+    if(isEmergencia == 0){
+      client.print(F("<button class=\"verde\">Toggle modo emergencia (ahora mismo: tranquilo"));
+    } else {
+      if(isEmergencia == 1){
+        client.print(F("<button class=\"amarillo\">Toggle modo emergencia (ahora mismo: moderado"));
+      } else {
+        client.print(F("<button class=\"rojo\">Toggle modo emergencia (ahora mismo: EMERGENCIA"));
+      }
+    }
+    client.print(F(")</button>\r\n"));
   }
-  client.print(F(")</button>\r\n"));
-  client.print(F("<button>Apagar/encender todo por completo</button>\r\n"));
+  client.print(F("<a href="));
+  client.print(WiFi.localIP());
+  if(isOnOff == 0){
+    client.print(F("/1>Apagar sistema</a>\r\n"));
+  } else {
+     client.print(F("/0>Encender sistema</a>\r\n"));   
+  }
   client.print(F("</html>"));
 
   // The client will actually be *flushed* then disconnected
