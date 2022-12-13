@@ -135,7 +135,6 @@ char *ftoa(double d, char *buffer, int precision) {
 }
 
 void wemos_recibir(){
-  Serial.write("recibiendo...");
   if(mySerial.available() > 0){
     while (!stringComplete){
       char inChar = mySerial.read();
@@ -152,10 +151,11 @@ void wemos_recibir(){
     if (stringComplete){
       hora = getValue(recibo, ':', 0).toInt();
       minuto = getValue(recibo, ':',1).toInt();
+      isOnOff = getValue(recibo, ':', 2).toInt();
       Serial.print("Son las ");
-      Serial.print(hora);
-      Serial.print(":");
-      Serial.println(minuto);
+      Serial.print(isOnOff);
+      //Serial.print(":");
+      //Serial.println(minuto);
       stringComplete = false;
       recibo = "";
     }
@@ -163,8 +163,6 @@ void wemos_recibir(){
 }
 
 void wemos_enviar(){
-  Serial.write("enviando...");
-
   // HACER LA CONVERSIÓN A ARRAY
   char tempe[7];
   char onoff[7];
@@ -189,18 +187,17 @@ void wemos_enviar(){
 }
 
 void triggerEmergencia(){
-  Serial.println("Esto es un pooblema previo");
+  isEmergencia = emergenciaPrevia;
+  emergenciaPrevia = 0;
   if(isEmergencia == 1){
-    Serial.println("Esto es un pooblema 1");
     digitalWrite(led, HIGH);
+    digitalWrite(buzzer, LOW);
   } else {
     if (isEmergencia == 2){
-      Serial.println("Esto es un pooblema 2");
       digitalWrite(led, HIGH);
       digitalWrite(buzzer, HIGH);
     } else {
       if (isEmergencia == 0){
-        Serial.println("Esto es un pooblema 0");
         digitalWrite(led, LOW);
         digitalWrite(buzzer, LOW);
       }
@@ -220,42 +217,42 @@ bool luz(){
 
 void detectarIntrusos(){
   if (luz() == 1){ /*ULTRASONIDOS DETECTAN INTRUSO*/
-   emergenciaPrevia = isEmergencia;
+   isIntruso = 0;
    if(umbralHoraBajo > umbralHoraAlto){
       if((hora > umbralHoraBajo) || (hora < umbralHoraAlto)){
-        Serial.println("=== EMERGENCIA ===");
-        isEmergencia = 2;
+        Serial.println("Emergencia GRAVE por intruso en habitación encendida");
+        isIntruso = 1;
+        emergenciaPrevia = 2;
       }
     } else {
       if(hora < umbralHoraAlto){
-        Serial.println("=== OTRA EMERGENCIA ===");
-        isEmergencia = 2;
+        Serial.println("Emergencia GRAVE por intruso en habitación encendida");
+        isIntruso = 1;
+        emergenciaPrevia = 2;
       }
     }
-    if (emergenciaPrevia > isEmergencia){
-      isEmergencia = emergenciaPrevia;
-    }
   } else {
-    isEmergencia = 0;
+    Serial.println("Emergencia NULA por intruso en habitación encendida");
+    if (emergenciaPrevia < 1) emergenciaPrevia = 0;
   }
 }
 
 void sensorMovimiento() {
-  readDistance();
-  Serial.print("distancia: ");
-  Serial.println(distance);
-  emergenciaPrevia = isEmergencia;
-  if(distance>minimumRange && distance < maximumRange){
-    isEmergencia = 2;
-  } else {
-    if (distance > maximumRange) {
-      isEmergencia = 0;
+  if (luz() == 0){
+    isIntruso = 1;
+    readDistance();
+    if(distance>minimumRange && distance < maximumRange){
+      Serial.println("Emergencia GRAVE por intruso");
+      emergenciaPrevia = 2;
+    } else {
+      if (distance > maximumRange) {
+        Serial.println("Emergencia NULA por intruso");
+        isIntruso = 0;
+        if (emergenciaPrevia < 1) emergenciaPrevia = 0;
+      }
     }
+    delay(50);
   }
-  if (emergenciaPrevia > isEmergencia){
-    isEmergencia = emergenciaPrevia;
-  }
-  delay(50);
 }
 
 int readDistance(){
@@ -275,32 +272,40 @@ void sensorTemperatura(){ // CAMBIAR PARA QUE DEVUELVA BOOL O INT CON VARIOS EST
   int valor = analogRead(lm35pin);
   float miliVoltios = (valor / 1023.0) * 5000;
   temperatura = miliVoltios / 10;
-
-  emergenciaPrevia = isEmergencia;
+  Serial.println();
   if(temperatura < tempMin || temperatura > tempMax){
     if(temperatura < tempMinMin || temperatura > tempMaxMax){
-      isEmergencia = 2;
+      Serial.println("Emergencia GRAVE por temperatura");
+      emergenciaPrevia = 2;
     } else {
-      isEmergencia = 1;
+      Serial.println("Emergencia LEVE por temperatura");
+      if (emergenciaPrevia < 2) emergenciaPrevia = 1;
     }
   } else {
-    isEmergencia = 0;
+    Serial.println("Emergencia NULA por temperatura");
+    if (emergenciaPrevia < 1) emergenciaPrevia = 0;
   }
-  if (emergenciaPrevia > isEmergencia){
-    isEmergencia = emergenciaPrevia;
-  }
-  Serial.print(temperatura);
-  Serial.println(" C");
+ 
+  //Serial.print(temperatura);
+  //Serial.println(" C");
   delay(50);
 }
 
 
 void loop(){
-  triggerEmergencia();
+  if(isOnOff == 0){
+    triggerEmergencia();
+  }
   wemos_enviar();
   wemos_recibir();
-  detectarIntrusos();
-  sensorMovimiento();
-  sensorTemperatura();
+  Serial.print(isOnOff);
+  if(isOnOff == 0){
+    detectarIntrusos();
+    sensorMovimiento();
+    sensorTemperatura();
+  } else {
+    emergenciaPrevia = 0;
+    triggerEmergencia();
+  }
   delay(1000);
 }
