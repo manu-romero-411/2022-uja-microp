@@ -13,8 +13,8 @@ int emergenciaPrevia;
 /* OTRAS VARIABLES AUXILIARES */
 // DETECCIÓN DE INTRUSOS SEGÚN HORA
 int minutoIntruso = 61;
-int umbralHoraAlto = 17;
-int umbralHoraBajo = 15;
+int umbralHoraAlto = 20;
+int umbralHoraBajo = 18;
 int espera = 1;
 
 // SENSOR DE ULTRASONIDOS
@@ -23,10 +23,10 @@ int maximumRange = 25; // Maximum range needed
 int minimumRange = 1; // Minimum range needed
 
 // SENSOR DE TEMPERATURA
-int tempMin = 19;
-int tempMinMin = 18;
-int tempMax = 29;
-int tempMaxMax = 30;
+int tempMin = 21;
+int tempMinMin = 20;
+int tempMax = 28;
+int tempMaxMax = 31;
 
 // INTERRUPTOR
 /* DEFINICIÓN DE PUERTOS */
@@ -293,19 +293,20 @@ void sensorTemperatura(){ // CAMBIAR PARA QUE DEVUELVA BOOL O INT CON VARIOS EST
 
 
 void loop(){
-  if(isOnOff == 0){
+  //if(isOnOff == 0){
     triggerEmergencia();
-  }
+  //}
   wemos_enviar();
   wemos_recibir();
-  Serial.print(isOnOff);
-  if(isOnOff == 0){
+  //Serial.print(isOnOff);
+  //if(isOnOff == 0){
     detectarIntrusos();
     sensorMovimiento();
     sensorTemperatura();
-  } else {
-    emergenciaPrevia = 0;
-    triggerEmergencia();
-  }
+  //} else {
+   // luz();
+   // emergenciaPrevia = 0;
+   // triggerEmergencia();
+  //}
   delay(1000);
 }
