@@ -16,8 +16,8 @@ int isIntruso;
 int isEmergencia;
 
 // conectarse al wifi y ntc//
-const String ssid     = "vodafone1B20";
-const String password = "NP7UTSVGTW5858";
+const String ssid     = "ssid";
+const String password = "passwd";
 const long utcOffsetInSeconds = 3600;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
